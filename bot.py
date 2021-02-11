@@ -138,7 +138,8 @@ def buyFlower(message, price, name):
                                    '\nК оплате : ' + str(fPrice) + ' грн💸' +
                                    '\n➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n' +
                                    'Подтвердите заказ: ', reply_markup=keyboard)
-            bot.register_next_step_handler(msg, confirmOrder, count, name, fPrice)
+            bot.register_next_step_handler(
+                msg, confirmOrder, count, name, fPrice)
 
         elif count == '/start':
             bot.clear_step_handler_by_chat_id(cid)
