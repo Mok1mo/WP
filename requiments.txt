@@ -1,11 +1,4 @@
-autopep8==1.5.4
-chardet==4.0.0
-idna==2.10
 mysql-connector-python==8.0.23
-protobuf==3.14.0
-pycodestyle==2.6.0
 pyTelegramBotAPI==3.7.6
 requests==2.25.1
-six==1.15.0
-toml==0.10.2
 urllib3==1.26.3
