@@ -2,8 +2,16 @@ import telebot
 from telebot import types
 import mysql.connector
 from telebot.types import ReplyKeyboardRemove
+import os
+from dotenv import load_dotenv
 
-bot = telebot.TeleBot('1505203267:AAGNOvojdLur7H7-Lowxtjg5aSoWtLfg92E')
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
+
+API_KEY = os.environ.get('API_KEY')
+
+bot = telebot.TeleBot(API_KEY)
 
 # Подключение к бд
 db = mysql.connector.connect(
