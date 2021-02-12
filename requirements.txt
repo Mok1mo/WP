@@ -2,3 +2,5 @@ mysql-connector-python==8.0.23
 pyTelegramBotAPI==3.7.6
 requests==2.25.1
 urllib3==1.26.3
+telebot==0.0.4
+PyMySQL==1.0.2
