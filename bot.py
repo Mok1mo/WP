@@ -132,46 +132,54 @@ def selectCategory(message):
     else:
         cursor.execute(
             f'SELECT id FROM category WHERE name=\'{message.text}\'')
-        categoryId = int(str(cursor.fetchone())[1:-2])
+        categoryId = str(cursor.fetchone())
         print('categoryId = ' + str(categoryId))
 
-        cursor.execute(
-            f'SELECT COUNT(*) FROM goods WHERE category=\'{categoryId}\'')
-        N = cursor.fetchone()
-        N = int(str(N)[1:-2])
-        print('N = ' + str(N))
-
-        if N != 0:
-            cursor.execute(
-                f'SELECT id FROM goods WHERE category=\'{categoryId}\'')
-            flowerId = []
-            for i in range(N):
-                flowerId.append(str(cursor.fetchone())[1:-2])
-
-            for i in flowerId:
-                keyboard = types.InlineKeyboardMarkup()
-                keyboard.add(*[types.InlineKeyboardButton(text=name, callback_data=name + ':' + str(i))  # Если не работает то тут проверка
-                               for name in ['☝️Добавить в корзину👈']])
-
-                cursor.execute(f'SELECT name FROM goods WHERE id=\'{i}\'')
-                name = str(cursor.fetchone())[2:-3]
-
-                cursor.execute(f'SELECT price FROM goods WHERE id=\'{i}\'')
-                price = str(cursor.fetchone())[1:-2]
-
-                cursor.execute(f'SELECT amount FROM goods WHERE id=\'{i}\'')
-                amount = str(cursor.fetchone())[1:-2]
-
-                msg = bot.send_photo(
-                    cid, open(f'images/{i}.jpg', 'rb'), caption=name +
-                    '\nВ наличие - ' + amount + ' шт' +
-                    '\n1️⃣ шт - ' + price + ' грн💸', reply_markup=keyboard)
-
+        if categoryId == 'None':
+            msg = bot.send_message(cid, 'Такой категории нет :(')
             bot.register_next_step_handler(msg, selectCategory)
 
         else:
-            msg = bot.send_message(cid, 'Сейчас нет в наличии :(')
-            bot.register_next_step_handler(msg, selectCategory)
+            categoryId = int(str(categoryId)[1:-2])
+
+            cursor.execute(
+                f'SELECT COUNT(*) FROM goods WHERE category=\'{categoryId}\'')
+            N = cursor.fetchone()
+            N = int(str(N)[1:-2])
+            print('N = ' + str(N))
+
+            if N != 0:
+                cursor.execute(
+                    f'SELECT id FROM goods WHERE category=\'{categoryId}\'')
+                flowerId = []
+                for i in range(N):
+                    flowerId.append(str(cursor.fetchone())[1:-2])
+
+                for i in flowerId:
+                    keyboard = types.InlineKeyboardMarkup()
+                    keyboard.add(*[types.InlineKeyboardButton(text=name, callback_data=name + ':' + str(i))  # Если не работает то тут проверка
+                                   for name in ['☝️Добавить в корзину👈']])
+
+                    cursor.execute(f'SELECT name FROM goods WHERE id=\'{i}\'')
+                    name = str(cursor.fetchone())[2:-3]
+
+                    cursor.execute(f'SELECT price FROM goods WHERE id=\'{i}\'')
+                    price = str(cursor.fetchone())[1:-2]
+
+                    cursor.execute(
+                        f'SELECT amount FROM goods WHERE id=\'{i}\'')
+                    amount = str(cursor.fetchone())[1:-2]
+
+                    msg = bot.send_photo(
+                        cid, open(f'images/{i}.jpg', 'rb'), caption=name +
+                        '\nВ наличие - ' + amount + ' шт' +
+                        '\n1️⃣ шт - ' + price + ' грн💸', reply_markup=keyboard)
+
+                bot.register_next_step_handler(msg, selectCategory)
+
+            else:
+                msg = bot.send_message(cid, 'Сейчас нет в наличии :(')
+                bot.register_next_step_handler(msg, selectCategory)
 
 
 # Корзина
