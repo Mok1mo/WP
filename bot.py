@@ -6,6 +6,7 @@ from telebot.types import InputMediaPhoto, ReplyKeyboardRemove
 import os
 from dotenv import load_dotenv
 import re
+import datetime
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(dotenv_path):
@@ -54,12 +55,12 @@ flowerDictData = {}
 # Глобальная переменная списка цветов
 flowerList = []
 
-# Корзина
-# cart = {}
-
 # Для показа всего к оплате из корзины
 msgId = 0
 allPrice = 0
+
+# Геолокация покупателя
+location = 0
 
 
 # Реакция на /start
@@ -179,98 +180,145 @@ def cart(message):
     global msgId
     allPrice = 0
 
-    cursor.execute('SELECT COUNT(*) FROM basket')
-    N = int(str(cursor.fetchone())[1:-2])
-    print('N = ' + str(N))
+    cursor.execute(
+        f'SELECT id FROM customers WHERE chat_id = {cid}')
+    custId = str(cursor.fetchone())[1:-2]
 
-    if N > 0:
+    cursor.execute(
+        f'SELECT id FROM orders WHERE id_cust = {custId} AND complit = \'0\'')
+    ordersId = cursor.fetchone()
+
+    if ordersId == None:
         keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
-        keyboard.add(*[types.KeyboardButton(text=name)
-                       for name in ['Меню📋', 'Оформить заказ📦']])
-        bot.send_message(
-            cid, 'В корзине🛍️ сейчас такие товары:', reply_markup=keyboard)
+        keyboard.add(*[types.KeyboardButton(text=name) for name in ['Меню📋']])
+        bot.send_message(cid, 'В корзине🛍️ сейчас нет товаров.',
+                         reply_markup=keyboard)
 
-        cart = {}
-        cursor.execute(
-            f'SELECT id_goods, amount, full_price FROM basket WHERE id_cust = \'{cid}\'')
-
-        for i in range(N):
-            cart.update({i: cursor.fetchone()})
-            print(cart)
-
-        for i in range(N):
-            flowerId = int(cart[i][0])
-            amount = int(cart[i][1])
-            fullPrice = int(cart[i][2])
-
-            cursor.execute(
-                f'SELECT name, price FROM goods WHERE id=\'{flowerId}\'')
-            a = str(cursor.fetchone())
-            name = str(a.split(', ')[0])[2:-1]
-            price = str(a.split(', ')[1])[:-1]
-
-            keyboard = types.InlineKeyboardMarkup()
-            keyboard.add(*[types.InlineKeyboardButton(text=name, callback_data=name + ':' + str(flowerId))
-                           for name in ['-', f'{amount} шт.', '+', '❌', f'К оплате - {fullPrice} грн💸']])
-            msg = bot.send_photo(
-                cid, open(f'images/{flowerId}.jpg', 'rb'), caption=name +
-                '\n1️⃣ шт - ' + price + ' грн💸', reply_markup=keyboard)
-
-            allPrice += int(fullPrice)
-
-        msgId = bot.send_message(
-            cid, f'💸Всего к оплате - {allPrice}  грн💸').message_id
-
-        bot.register_next_step_handler(msg, phoheNumber, cart)
-
+    # Сделать так что бы не показывалась купленая корзина
     else:
-        keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
-        keyboard.add(*[types.KeyboardButton(text=name)
-                       for name in ['Меню📋']])
-        bot.send_message(
-            cid, 'В корзине🛍️ сейчас нет товаров.', reply_markup=keyboard)
+        ordersId = int(str(ordersId)[1:-2])
+        print('ordersId = ' + str(ordersId))
+
+        cursor.execute(
+            f'SELECT COUNT(*) FROM basket WHERE id_orders = {ordersId}')
+        N = int(str(cursor.fetchone())[1:-2])
+        print('N = ' + str(N))
+
+        if N > 0:
+            keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
+            keyboard.add(*[types.KeyboardButton(text=name)
+                           for name in ['Меню📋', 'Оформить заказ📦']])
+            bot.send_message(
+                cid, 'В корзине🛍️ сейчас такие товары:', reply_markup=keyboard)
+
+            cart = {}
+            cursor.execute(
+                f'SELECT id_goods, amount, full_price FROM basket WHERE id_orders = \'{ordersId}\'')
+
+            for i in range(N):
+                cart.update({i: cursor.fetchone()})
+                print('cart = ' + str(cart))
+
+            for i in range(N):
+                flowerId = int(cart[i][0])
+                amount = int(cart[i][1])
+                fullPrice = int(cart[i][2])
+
+                cursor.execute(
+                    f'SELECT name, price FROM goods WHERE id=\'{flowerId}\'')
+                a = str(cursor.fetchone())
+                name = str(a.split(', ')[0])[2:-1]
+                price = str(a.split(', ')[1])[:-1]
+
+                keyboard = types.InlineKeyboardMarkup()
+                keyboard.add(*[types.InlineKeyboardButton(text=name, callback_data=name + ':' + str(flowerId))
+                               for name in ['-', f'{amount} шт.', '+', '❌', f'К оплате - {fullPrice} грн💸']])
+                msg = bot.send_photo(
+                    cid, open(f'images/{flowerId}.jpg', 'rb'), caption=name +
+                    '\n1️⃣ шт - ' + price + ' грн💸', reply_markup=keyboard)
+
+                allPrice += int(fullPrice)
+
+            msgId = bot.send_message(
+                cid, f'💸Всего к оплате - {allPrice}  грн💸').message_id
+
+            bot.register_next_step_handler(msg, phoheNumber, cart)
+
+        else:
+            keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
+            keyboard.add(*[types.KeyboardButton(text=name)
+                           for name in ['Меню📋']])
+            bot.send_message(
+                cid, 'В корзине🛍️ сейчас нет товаров.', reply_markup=keyboard)
 
 
 def phoheNumber(message, cart):
     cid = message.chat.id
 
     if message.text == 'Оформить заказ📦':
-        keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
-        reg_button = types.KeyboardButton(
-            text="Отправить номер телефона📲", request_contact=True,)
-        keyboard.add('Отменить❌', reg_button)
-        msg = bot.send_message(message.chat.id,
-                               'Оставьте ваш контактный номер чтобы мы смогли связаться с вами: ',
-                               reply_markup=keyboard)
-        bot.register_next_step_handler(msg, delivery, cart)
+        cursor.execute(f'SELECT phone FROM customers WHERE chat_id = {cid}')
+        phone = str(cursor.fetchone())[1:-2]
+        print(phone)
+
+        if phone != 'None':
+            bot.send_message(message.chat.id, 'Мы вас помним :)')
+
+            keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
+            reg_button = types.KeyboardButton(text="Отправить локацию",
+                                              request_location=True)
+            keyboard.add('Отменить❌', reg_button)
+
+            msg = bot.send_message(message.chat.id,
+                                   'Укажите место доставки: ',
+                                   reply_markup=keyboard)
+
+            bot.register_next_step_handler(msg, buyCart, cart)
+
+        else:
+            keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
+            reg_button = types.KeyboardButton(text="Отправить номер телефона📲",
+                                              request_contact=True,)
+            keyboard.add('Отменить❌', reg_button)
+            msg = bot.send_message(message.chat.id,
+                                   'Оставьте ваш контактный номер чтобы мы смогли связаться с вами: ',
+                                   reply_markup=keyboard)
+            bot.register_next_step_handler(msg, delivery, cart)
 
     elif message.text == 'Меню📋':
         mainMenu(message)
+
+    else:
+        bot.send_message(cid, 'Такой команды нет')
+        bot.clear_step_handler_by_chat_id(cid)
+        cart(message)
 
 
 def delivery(message, cart):
     cid = message.chat.id
 
     if message.text == 'Отменить❌':
+        bot.clear_step_handler_by_chat_id(cid)
         start_message(message)
 
     else:
-        nomer = message.contact
+        nomer = message.contact.phone_number
         try:
             cursor.execute(
-                f'UPDATE customers SET phone = \'{nomer}\' WHERE chat_id = \'{cid}\'')
+                f'UPDATE customers SET phone = {nomer} WHERE chat_id = {cid}')
             db.commit()
-        except:
+        except Exception as e:
             db.rollback()
+            print(e)
 
-        #Описать в доке про кнопку
+        # Описать в доке про кнопку
         keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
-        reg_button = types.KeyboardButton(text="Отправить локацию",request_location=True)
+        reg_button = types.KeyboardButton(
+            text="Отправить локацию", request_location=True)
         keyboard.add('Отменить❌', reg_button)
         msg = bot.send_message(message.chat.id,
                                'Укажите место доставки: ',
                                reply_markup=keyboard)
-                               
+
         bot.register_next_step_handler(msg, buyCart, cart)
 
 
@@ -280,18 +328,19 @@ def buyCart(message, cart):
 
     global allPrice
     allPrice = 0
-
     d = {}
     desc = ''
+    global location
+    location = 0
 
     if message.text == 'Отменить❌':
+        bot.clear_step_handler_by_chat_id(cid)
         start_message(message)
 
     else:
-        #вынести в документацию
+        # вынести в документацию
         location = f'{message.location.latitude},{message.location.longitude}'
         print(location)
-        #
 
         for i in range(len(cart)):
             flowerId = int(cart[i][0])
@@ -305,15 +354,22 @@ def buyCart(message, cart):
             amount = str(cursor.fetchone())[1:-2]
 
             d.update({f'{name}': f'{amount}'})
-
         print(d)
 
         for i in d:
             desc += f'{i} - {d.get(i)} шт\n'
-
         print(desc)
 
-        cursor.execute(f'SELECT full_price FROM basket')
+        cursor.execute(
+            f'SELECT id FROM customers WHERE chat_id = {cid}')
+        custId = int(str(cursor.fetchone())[1:-2])
+
+        cursor.execute(
+            f'SELECT id FROM orders WHERE id_cust = \'{custId}\' AND complit = \'0\'')
+        ordersId = int(str(cursor.fetchone())[1:-2])
+
+        cursor.execute(
+            f'SELECT full_price FROM basket WHERE id_orders = \'{ordersId}\'')
         for i in range(len(cart)):
             fullPrice = int(str(cursor.fetchone())[1:-2])
             allPrice += fullPrice
@@ -325,7 +381,15 @@ def buyCart(message, cart):
                        for text in ['Меню📋']])
         bot.send_message(cid, 'Ваш заказ сформирован:', reply_markup=keyboard)
 
-        bot.send_invoice(message.chat.id, title='📦Заказ № ...',
+        cursor.execute(
+            f'SELECT id FROM customers WHERE chat_id = {cid}')
+        custId = int(str(cursor.fetchone())[1:-2])
+
+        cursor.execute(
+            f'SELECT id FROM orders WHERE id_cust = \'{custId}\' AND complit = \'0\'')
+        ordersId = int(str(cursor.fetchone())[1:-2])
+
+        bot.send_invoice(message.chat.id, title=f'📦Заказ №{ordersId}',
                          description='Все цветы вырощены в наших теплицах и обладают выраженим ароматом🌸👃😋',
                          provider_token=provider_token,
                          currency='uah',
@@ -346,16 +410,28 @@ def checkout(pre_checkout_query):
 # Реакция на успешный платеж
 @bot.message_handler(content_types=['successful_payment'])
 def got_payment(message):
-#TODO:
-    # try:
-    #     cursor.execute(
-    #         f'INSERT INTO orders (id_cust, name) VALUES (\'{categoryId}\', \'{newFlower}\')')
-    #     db.commit()
-    # except:
-    #     db.rollback()
+    cid = message.chat.id
+    now = datetime.datetime.now()
+
+    cursor.execute(
+        f'SELECT id FROM customers WHERE chat_id = {cid}')
+    custId = int(str(cursor.fetchone())[1:-2])
+
+    cursor.execute(
+        f'SELECT id FROM orders WHERE id_cust = \'{custId}\' AND complit = \'0\'')
+    ordersId = int(str(cursor.fetchone())[1:-2])
+
+    # Внесение изменений
+    try:
+        cursor.execute(
+            f'UPDATE orders SET allprice = \'{allPrice}\', time = \'{now}\', address = \'{location}\', complit = \'1\' WHERE id_cust = {custId} AND complit = \'0\'')
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(e)
 
     bot.send_message(message.chat.id,
-                     '📦Заказ № ... оплачен☺️👍\n' +
+                     f'📦Заказ №{ordersId} оплачен☺️👍\n' +
                      '\nОн будет у вас в ближайщее время⌚️. В случае ошибки используйте /help\n' +
                      '\n😋Хорошего времени суток😋')
 
@@ -458,8 +534,12 @@ def adminArea(message):
         bot.register_next_step_handler(msg, adminSelectCategory)
 
     elif message.text == 'Показать отчёт':
-        msg = bot.send_message(cid, 'отчёт')
-        bot.register_next_step_handler(msg, adminArea)
+        keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
+        keyboard.add(*[types.KeyboardButton(text=admbutton)
+                       for admbutton in ['За день', 'За месяц', 'По клиентам', 'По товарам']])
+        msg = bot.send_message(
+            cid, 'Выберете нужный отчёт', reply_markup=keyboard)
+        bot.register_next_step_handler(msg, chooseReport)
 
     elif message.text == 'Выйти из админ панели':
         bot.send_message(cid, 'Вы вышли из админ панели' +
@@ -519,8 +599,8 @@ def adminSelectCategoryForEdit(message):
                                for name in ['Редактировать цену', 'Редактировать количество', 'Удалить товар']])
                 msg = bot.send_photo(
                     cid, open(f'images/{flowerId}.jpg', 'rb'), caption=name +
-                    'В наличие - ' + amount + ' шт' +
-                    '1️⃣ шт - ' + price + ' грн💸', reply_markup=keyboard)
+                    '\nВ наличие - ' + amount + ' шт' +
+                    '\n1️⃣ шт - ' + price + ' грн💸', reply_markup=keyboard)
 
             bot.register_next_step_handler(msg, adminSelectCategoryForEdit)
 
@@ -857,6 +937,33 @@ def adminConfirmDel(message, flowerId):
         bot.register_next_step_handler(msg, adminSelectCategoryForEdit)
 
 
+# Отчёты
+def chooseReport(message):
+    cid = message.chat.id
+
+    if message.text == 'За день':
+        today = str(datetime.datetime.today()).split(' ')[0]
+        print(today)
+
+        cursor.execute(
+            f'SELECT * FROM orders WHERE time=\'{today}\'')
+        forDay = str(cursor.fetchall())
+        print('forDay = ' + str(forDay))
+
+        # my_file = open("DayReport.csv", "w+")
+        # my_file.write('')
+        # my_file.close()
+
+    elif message.text == 'За месяц':
+        pass
+
+    elif message.text == 'По клиентам':
+        pass
+
+    elif message.text == 'По товарам':
+        pass
+
+
 # Реакция на /help
 @ bot.message_handler(commands=['help'])
 def help_message(message):
@@ -899,19 +1006,54 @@ def send_answer(call):
         flowerId = call.data.split(':')[1]
 
         cursor.execute(
-            f'SELECT price FROM goods WHERE id=\'{flowerId}\'')
+            f'SELECT price FROM goods WHERE id = {flowerId} ')
         price = int(str(cursor.fetchone())[1:-2])
+
+        cursor.execute(
+            f'SELECT id FROM customers WHERE chat_id = {cid}')
+        custId = int(str(cursor.fetchone())[1:-2])
+
+        # Должно при нажатии добавлять 1 запись с 1 cust_id /// Добавлять ещё одну если предидущая закрыта
+        try:
+            cursor.execute(
+                f'SELECT id FROM orders WHERE id_cust = \'{custId}\' AND complit = \'0\'')
+            ordersId = str(cursor.fetchone())
+            print('ordersId = ' + str(ordersId))
+
+            if ordersId == 'None':
+                cursor.execute(
+                    f'INSERT INTO orders (id_cust) VALUES (\'{custId}\')')
+                db.commit()
+            else:
+                ordersId = str(ordersId)[1:-2]
+                cursor.execute(
+                    f'SELECT complit FROM orders WHERE id = \'{ordersId}\'')
+                complitStatus = int(str(cursor.fetchone())[1:-2])
+
+                if complitStatus == 1:
+                    cursor.execute(
+                        f'INSERT INTO orders (id_cust) VALUES (\'{custId}\')')
+                    db.commit()
+                else:
+                    pass
+        except Exception as e:
+            db.rollback()
+            print(e)
+
+        cursor.execute(
+            f'SELECT id FROM orders WHERE id_cust = \'{custId}\' AND complit = \'0\'')
+        ordersId = str(cursor.fetchone())[1:-2]
 
         try:
             cursor.execute(
-                f'INSERT INTO basket (id_cust, id_goods, amount, full_price) VALUES (\'{cid}\', \'{flowerId}\', \'1\', \'{price}\')')
+                f'INSERT INTO basket (id_orders, id_goods, amount, full_price) VALUES ({ordersId}, {flowerId}, 1, {price})')
             db.commit()
-        except:
+        except Exception as e:
             db.rollback()
-            print("err")
+            print(e)
 
         cursor.execute(
-            f'SELECT amount FROM basket WHERE id_goods=\'{flowerId}\'')
+            f'SELECT amount FROM basket WHERE id_goods=\'{flowerId}\' AND id_orders = {ordersId}')
         amount = int(str(cursor.fetchone())[1:-2])
 
         fullPrice = amount * price
@@ -924,12 +1066,12 @@ def send_answer(call):
         # Редактирование общей оплаты
         try:
             cursor.execute(
-                f'SELECT COUNT(*) FROM basket')
+                f'SELECT COUNT(*) FROM basket WHERE id_orders = {ordersId}')
             N = int(str(cursor.fetchone())[1:-2])
             print('N = ' + str(N))
 
             cursor.execute(
-                f'SELECT full_price FROM basket')
+                f'SELECT full_price FROM basket WHERE id_orders = {ordersId}')
 
             for i in range(N):
                 fullPrice = int(str(cursor.fetchone())[1:-2])
@@ -946,11 +1088,21 @@ def send_answer(call):
 
         flowerId = call.data.split(':')[1]
 
+        cursor.execute(
+            f'SELECT id FROM customers WHERE chat_id = {cid}')
+        custId = int(str(cursor.fetchone())[1:-2])
+
+        cursor.execute(
+            f'SELECT id FROM orders WHERE id_cust = \'{custId}\' AND complit = \'0\'')
+        ordersId = str(cursor.fetchone())[1:-2]
+
         try:
             cursor.execute(
-                f'DELETE FROM basket WHERE id_goods= \'{flowerId}\' AND id_cust = \'{cid}\'')
+                f'DELETE FROM basket WHERE id_goods= {flowerId} AND id_orders = {ordersId}')
             db.commit()
-        except:
+            print('udaleno')
+        except Exception as e:
+            print(e)
             db.rollback()
 
         keyboard = types.InlineKeyboardMarkup()
@@ -961,12 +1113,12 @@ def send_answer(call):
         # Редактирование общей оплаты
         try:
             cursor.execute(
-                f'SELECT COUNT(*) FROM basket')
+                f'SELECT COUNT(*) FROM basket WHERE id_orders = {ordersId}')
             N = int(str(cursor.fetchone())[1:-2])
             print('N = ' + str(N))
 
             cursor.execute(
-                f'SELECT full_price FROM basket')
+                f'SELECT full_price FROM basket WHERE id_orders = {ordersId}')
 
             for i in range(N):
                 fullPrice = int(str(cursor.fetchone())[1:-2])
@@ -981,64 +1133,34 @@ def send_answer(call):
         flowerId = call.data.split(':')[1]
 
         cursor.execute(
-            f'SELECT amount FROM basket WHERE id_goods=\'{flowerId}\'')
-        amount = int(str(cursor.fetchone())[1:-2]) + 1
+            f'SELECT id FROM customers WHERE chat_id = {cid}')
+        custId = int(str(cursor.fetchone())[1:-2])
 
         cursor.execute(
-            f'SELECT price FROM goods WHERE id=\'{flowerId}\'')
-        price = int(str(cursor.fetchone())[1:-2])
-
-        fullPrice = amount * price
-
-        try:
-            cursor.execute(
-                f'UPDATE basket SET amount = \'{amount}\', full_price = \'{fullPrice}\' WHERE id_goods = \'{flowerId}\' AND id_cust = \'{cid}\'')
-            db.commit()
-        except:
-            db.rollback()
-
-        keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(*[types.InlineKeyboardButton(text=name, callback_data=name + ':' + str(flowerId))
-                       for name in ['-', f'{amount} шт.', '+', '❌', f'К оплате - {fullPrice} грн💸']])
-        bot.edit_message_reply_markup(cid, mid, reply_markup=keyboard)
-        print('amount = ' + str(amount))
-
-        # Редактирование общей оплаты
-        cursor.execute(
-            f'SELECT COUNT(*) FROM basket')
-        N = int(str(cursor.fetchone())[1:-2])
-        print('N = ' + str(N))
-
-        if N != 0:
-            cursor.execute(
-                f'SELECT full_price FROM basket')
-
-            for i in range(N):
-                fullPrice = int(str(cursor.fetchone())[1:-2])
-                allPrice += fullPrice
-
-            bot.edit_message_text(
-                f'💸Всего к оплате - {allPrice}  грн💸', cid, msgId)
-
-    elif re.match(r'-', call.data):
-        flowerId = call.data.split(':')[1]
+            f'SELECT id FROM orders WHERE id_cust = \'{custId}\' AND complit = \'0\'')
+        ordersId = int(str(cursor.fetchone())[1:-2])
 
         cursor.execute(
-            f'SELECT amount FROM basket WHERE id_goods=\'{flowerId}\'')
+            f'SELECT amount FROM basket WHERE id_goods=\'{flowerId}\' AND id_orders = \'{ordersId}\'')
         amount = int(str(cursor.fetchone())[1:-2])
+        # amount = int(str(cursor.fetchone())[1:-2]) + 1
 
         cursor.execute(
-            f'SELECT price FROM goods WHERE id=\'{flowerId}\'')
-        price = int(str(cursor.fetchone())[1:-2])
+            f'SELECT amount FROM goods WHERE id=\'{flowerId}\'')
+        allAmount = int(str(cursor.fetchone())[1:-2])
 
-        if amount > 1:
-            amount -= 1
+        if amount < allAmount:
+            amount += 1
+
+            cursor.execute(
+                f'SELECT price FROM goods WHERE id=\'{flowerId}\'')
+            price = int(str(cursor.fetchone())[1:-2])
 
             fullPrice = amount * price
 
             try:
                 cursor.execute(
-                    f'UPDATE basket SET amount = \'{amount}\', full_price = \'{fullPrice}\' WHERE id_goods = \'{flowerId}\' AND id_cust = \'{cid}\'')
+                    f'UPDATE basket SET amount = \'{amount}\', full_price = \'{fullPrice}\' WHERE id_goods = \'{flowerId}\' AND id_orders = \'{ordersId}\'')
                 db.commit()
             except:
                 db.rollback()
@@ -1052,12 +1174,68 @@ def send_answer(call):
             # Редактирование общей оплаты
             try:
                 cursor.execute(
-                    f'SELECT COUNT(*) FROM basket')
+                    f'SELECT COUNT(*) FROM basket WHERE id_orders = {ordersId}')
                 N = int(str(cursor.fetchone())[1:-2])
                 print('N = ' + str(N))
 
                 cursor.execute(
-                    f'SELECT full_price FROM basket')
+                    f'SELECT full_price FROM basket WHERE id_orders = {ordersId}')
+
+                for i in range(N):
+                    fullPrice = int(str(cursor.fetchone())[1:-2])
+                    allPrice += fullPrice
+
+                bot.edit_message_text(
+                    f'💸Всего к оплате - {allPrice}  грн💸', cid, msgId)
+            except Exception as e:
+                print(e)
+
+    elif re.match(r'-', call.data):
+        flowerId = call.data.split(':')[1]
+
+        cursor.execute(
+            f'SELECT id FROM customers WHERE chat_id = {cid}')
+        custId = int(str(cursor.fetchone())[1:-2])
+
+        cursor.execute(
+            f'SELECT id FROM orders WHERE id_cust = \'{custId}\' AND complit = \'0\'')
+        ordersId = int(str(cursor.fetchone())[1:-2])
+
+        cursor.execute(
+            f'SELECT amount FROM basket WHERE id_goods=\'{flowerId}\' AND id_orders = \'{ordersId}\'')
+        amount = int(str(cursor.fetchone())[1:-2])
+
+        cursor.execute(
+            f'SELECT price FROM goods WHERE id=\'{flowerId}\'')
+        price = int(str(cursor.fetchone())[1:-2])
+
+        if amount > 1:
+            amount -= 1
+
+            fullPrice = amount * price
+
+            try:
+                cursor.execute(
+                    f'UPDATE basket SET amount = \'{amount}\', full_price = \'{fullPrice}\' WHERE id_goods = \'{flowerId}\' AND id_orders = \'{ordersId}\'')
+                db.commit()
+            except:
+                db.rollback()
+
+            keyboard = types.InlineKeyboardMarkup()
+            keyboard.add(*[types.InlineKeyboardButton(text=name, callback_data=name + ':' + str(flowerId))
+                           for name in ['-', f'{amount} шт.', '+', '❌', f'К оплате - {fullPrice} грн💸']])
+            bot.edit_message_reply_markup(cid, mid, reply_markup=keyboard)
+            print('amount = ' + str(amount))
+
+            # Редактирование общей оплаты
+            try:
+                cursor.execute(
+                    f'SELECT COUNT(*) FROM basket WHERE id_orders = {ordersId}')
+                N = int(str(cursor.fetchone())[1:-2])
+                print('N = ' + str(N))
+
+                cursor.execute(
+                    f'SELECT full_price FROM basket WHERE id_orders = {ordersId}')
 
                 for i in range(N):
                     fullPrice = int(str(cursor.fetchone())[1:-2])
@@ -1107,21 +1285,8 @@ def send_answer(call):
             cid, 'Вы уверены, что хотите удали этот товар?', reply_markup=keyboard)
         bot.register_next_step_handler(msg, adminConfirmDel, flowerId)
 
-#################################################################################
-    # '😉Ваш букет будет готов в течение пары минут⏳' +
-    #                      '\n➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n' +
-    #                      '◾️/start - совершить ещё покупку', reply_markup=ReplyKeyboardRemove())
-    #     bot.send_message('461861635', 'Заказали букет - ' + name +
-    #                      '\nКоличество - ' + count + ' шт' +
-    #                      '\n➖➖➖➖➖➖➖➖➖➖' +
-    #                      '\nК оплате - ' + str(fPrice) + ' грн💸')
-
-    # elif answ == 'Отменить заказ':
-    #     bot.send_message(cid, '📦Ваш заказ успешно отменен!🚮' +
-    #                      '\n➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖\n' +
-    #                      '◾️/start - вернуться на главную', reply_markup=ReplyKeyboardRemove())
-    # else:
-# msg = bot.send_message(cid, 'Такого ответа нет, используйте панель😕')
+    elif re.match(r'К оплате - ', call.data):
+        phoheNumber(call.message, cart)
 
 
 bot.skip_pending = True
