@@ -13,7 +13,10 @@ if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
 
 API_KEY = os.environ.get('API_KEY')
+DB_HOST = os.environ.get('DB_HOST')
+DB_USER = os.environ.get('DB_USER')
 DB_PASS = os.environ.get('DB_PASS')
+DB_DATABASE = os.environ.get('DB_DATABASE')
 ADMN_PASS = os.environ.get('ADMN_PASS')
 PROVIDER_TOKEN = os.environ.get('PROVIDER_TOKEN')
 
@@ -22,10 +25,10 @@ provider_token = PROVIDER_TOKEN
 
 # Подключение к бд
 db = mysql.connector.connect(
-    host="localhost",
-    user="root",
+    host=DB_HOST,
+    user=DB_USER,
     password=DB_PASS,
-    database="flowers",
+    database=DB_DATABASE,
 )
 cursor = db.cursor(buffered=True)
 
