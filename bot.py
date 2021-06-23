@@ -86,7 +86,7 @@ def start_message(message):
     keyboard.add(*[types.KeyboardButton(text=name)
                    for name in ['Меню📋', 'Корзина🛍️']])
     bot.send_photo(
-        cid, open('images/hello.jpg', 'rb'), caption=f'Здравствуйте, {user.first}\nДобро пожаловать в наш цветочный магазин💐', reply_markup=keyboard)
+        cid, open('images/hello.jpg', 'rb'), caption=f'Здравствуйте, {user.first}\nДобро пожаловать в наш цветочный магазин💐\n©️Мокиенко Илья 2021р.', reply_markup=keyboard)
 
 
 def mainMenu(message):
