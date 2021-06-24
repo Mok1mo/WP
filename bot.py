@@ -13,10 +13,10 @@ if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
 
 API_KEY = os.environ.get('API_KEY')
-DB_HOST = os.environ.get('DB_HOST')
-DB_USER = os.environ.get('DB_USER')
-DB_PASS = os.environ.get('DB_PASS')
-DB_DATABASE = os.environ.get('DB_DATABASE')
+# DB_HOST = os.environ.get('DB_HOST')
+# DB_USER = os.environ.get('DB_USER')
+# DB_PASS = os.environ.get('DB_PASS')
+# DB_DATABASE = os.environ.get('DB_DATABASE')
 ADMN_PASS = os.environ.get('ADMN_PASS')
 PROVIDER_TOKEN = os.environ.get('PROVIDER_TOKEN')
 
@@ -25,10 +25,10 @@ provider_token = PROVIDER_TOKEN
 
 # Подключение к бд
 db = mysql.connector.connect(
-    host=DB_HOST,
-    user=DB_USER,
-    password=DB_PASS,
-    database=DB_DATABASE,
+    host='localhost',
+    user='root',
+    password='789456',
+    database='flowers',
 )
 cursor = db.cursor(buffered=True)
 
@@ -494,7 +494,7 @@ def adminArea(message):
             flowerList.append(str(cursor.fetchone())[2:-3])
 
         keyboard = types.ReplyKeyboardMarkup(1, row_width=1, selective=0)
-        keyboard.add('Назад◀️')
+        keyboard.add('◀️Назад')
         keyboard.add(*[types.KeyboardButton(text=name)
                        for name in flowerList])
         print('flowerList = ' + str(flowerList))
@@ -545,12 +545,15 @@ def adminArea(message):
         bot.register_next_step_handler(msg, adminSelectCategory)
 
     elif message.text == 'Показать отчёт':
-        keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
-        keyboard.add(*[types.KeyboardButton(text=admbutton)
-                       for admbutton in ['За день', 'За месяц', 'По клиентам', 'По товарам']])
+        # keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
+        # keyboard.add(*[types.KeyboardButton(text=admbutton)
+        #                for admbutton in ['За день', 'За месяц', 'По клиентам', 'По товарам']])
+        # msg = bot.send_message(
+        #     cid, 'Выберете нужный отчёт', reply_markup=keyboard)
+        # bot.register_next_step_handler(msg, chooseReport)
         msg = bot.send_message(
-            cid, 'Выберете нужный отчёт', reply_markup=keyboard)
-        bot.register_next_step_handler(msg, chooseReport)
+            cid, 'отчёт')
+        bot.register_next_step_handler(msg, adminArea)
 
     elif message.text == 'Выйти из админ панели':
         bot.send_message(cid, 'Вы вышли из админ панели' +
@@ -569,8 +572,16 @@ def adminArea(message):
 def adminSelectCategoryForEdit(message):
     cid = message.chat.id
 
-    if message.text != '◀️Назад':
+    if message.text == '◀️Назад':
+        keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
+        keyboard.add(*[types.KeyboardButton(text=admbutton)
+                       for admbutton in ['Редактировать товар', 'Добавить товар', 'Добавить категорию', 'Показать отчёт']])
+        keyboard.add('Выйти из админ панели')
 
+        msg = bot.send_message(cid, 'Окей', reply_markup=keyboard)
+        bot.register_next_step_handler(msg, adminArea)
+
+    else:
         global flowerDictData
         category = message.text
 
@@ -586,6 +597,7 @@ def adminSelectCategoryForEdit(message):
             print('N = ' + str(N))
 
         except:
+            bot.clear_step_handler_by_chat_id(cid)
             msg = bot.send_message(
                 cid, 'Сейчас нет в наличии :(\nВыберете другую категорию: ')
             bot.register_next_step_handler(msg, adminSelectCategoryForEdit)
@@ -619,15 +631,6 @@ def adminSelectCategoryForEdit(message):
             msg = bot.send_message(
                 cid, 'Сейчас нет в наличии :(\nВыберете другую категорию: ')
             bot.register_next_step_handler(msg, adminSelectCategoryForEdit)
-
-    else:
-        keyboard = types.ReplyKeyboardMarkup(1, row_width=2, selective=0)
-        keyboard.add(*[types.KeyboardButton(text=admbutton)
-                       for admbutton in ['Редактировать товар', 'Добавить товар', 'Добавить категорию', 'Показать отчёт']])
-        keyboard.add('Выйти из админ панели')
-
-        msg = bot.send_message(cid, 'Окей', reply_markup=keyboard)
-        bot.register_next_step_handler(msg, adminArea)
 
 
 # Редактирование цены
@@ -949,30 +952,30 @@ def adminConfirmDel(message, flowerId):
 
 
 # Отчёты
-def chooseReport(message):
-    cid = message.chat.id
+# def chooseReport(message):
+#     cid = message.chat.id
 
-    if message.text == 'За день':
-        today = str(datetime.datetime.today()).split(' ')[0]
-        print(today)
+#     if message.text == 'За день':
+#         today = str(datetime.datetime.today()).split(' ')[0]
+#         print(today)
 
-        cursor.execute(
-            f'SELECT * FROM orders WHERE time=\'{today}\'')
-        forDay = str(cursor.fetchall())
-        print('forDay = ' + str(forDay))
+#         cursor.execute(
+#             f'SELECT * FROM orders WHERE time=\'{today}\'')
+#         forDay = str(cursor.fetchall())
+#         print('forDay = ' + str(forDay))
 
-        # my_file = open("DayReport.csv", "w+")
-        # my_file.write('')
-        # my_file.close()
+#         # my_file = open("DayReport.csv", "w+")
+#         # my_file.write('')
+#         # my_file.close()
 
-    elif message.text == 'За месяц':
-        pass
+#     elif message.text == 'За месяц':
+#         pass
 
-    elif message.text == 'По клиентам':
-        pass
+#     elif message.text == 'По клиентам':
+#         pass
 
-    elif message.text == 'По товарам':
-        pass
+#     elif message.text == 'По товарам':
+#         pass
 
 
 # Реакция на /help
